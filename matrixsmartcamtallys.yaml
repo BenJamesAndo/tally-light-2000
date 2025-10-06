@@ -1,0 +1,377 @@
+esphome:
+  name: "matrixsmarttally"
+  friendly_name: M5 Matrix Smart Tally
+  name_add_mac_suffix: true
+  comment: Smart Wifi Tally Light M5 Atom Matrix
+  project:
+    name: esphome.smart-program-tally-light
+    version: "1.0"
+  on_boot:
+    priority: -100
+    then:
+      - script.execute: boot_effect
+
+esp32:
+  board: m5stack-atom
+  framework:
+    type: esp-idf
+
+logger:
+
+web_server:
+  version: 3
+
+api:
+
+ota:
+  - platform: esphome
+
+wifi:
+#  ssid: !secret wifi_ssid
+#  password: !secret wifi_password
+#  use_address: 192.168.1.191
+  ap:
+improv_serial:
+
+captive_portal:
+
+script:
+  - id: boot_effect
+    then:
+      - button.press:
+          id: show_1_dot_button
+      - delay: 0.4s
+      - button.press:
+          id: show_2_dots_button
+      - delay: 0.4s
+      - button.press:
+          id: show_3_dots_button
+      - delay: 0.4s
+      - button.press:
+          id: show_4_dots_button
+      - delay: 0.4s
+      - button.press:
+          id: show_5_dots_button
+      - delay: 0.4s
+      - button.press:
+          id: clear_dots_button
+      - delay: 0.4s
+
+  - id: show_dots
+    parameters:
+      num_dots: int
+    then:
+      - lambda: |-
+          id(display_dots) = num_dots;
+      - component.update: led_matrix_display
+      - if:
+          condition:
+            lambda: 'return !id(matrix_light).current_values.is_on();'
+          then:
+            - light.turn_on:
+                id: matrix_light
+                brightness: !lambda 'return id(led_brightness).state / 100.0;'
+
+  - id: update_tally_display
+    then:
+      - lambda: |-
+          int program = (int)id(current_program_source).state;
+          int preview = (int)id(current_preview_source).state;
+          int tally_num = (int)id(tally_camera_number).state;
+          
+          // Update dots based on program source
+          if (program >= 1 && program <= 5) {
+            id(display_dots) = program;
+          } else {
+            id(display_dots) = 0;
+          }
+          
+          // Update tally color based on this camera's status
+          if (tally_num == program) {
+            // This camera is on program - show red
+            id(tally_color) = 1; // Red
+          } else if (tally_num == preview) {
+            // This camera is on preview - show green
+            id(tally_color) = 2; // Green
+          } else {
+            // This camera is not active
+            id(tally_color) = 0; // Off
+          }
+      - component.update: led_matrix_display
+
+# Add global variables to track display state
+globals:
+  - id: display_dots
+    type: int
+    restore_value: no
+    initial_value: '0'
+  
+  - id: tally_color
+    type: int
+    restore_value: no
+    initial_value: '0'  # 0 = off, 1 = red (program), 2 = green (preview)
+
+binary_sensor:
+  - platform: gpio
+    name: "Single Button Press"
+    id: button1
+    icon: mdi:gesture-tap-button
+    pin:
+      number: 39
+      inverted: true
+    on_multi_click:
+    - timing:
+        - ON for at most 1s
+        - OFF for at least 0.5s
+      then:
+        - logger.log: "Single Click"
+
+# Define the LED matrix display
+light:
+  - platform: esp32_rmt_led_strip
+    chipset: ws2812
+    rgb_order: GRB
+    internal: false
+    icon: mdi:led-outline
+    pin: 27
+    num_leds: 25
+    id: matrix_light
+    name: "Atom Matrix Light"
+    # Remove the fixed color_correct - brightness will be handled dynamically
+    default_transition_length: 0s
+
+button:
+  - platform: template
+    name: "Preview Tally"
+    id: preview_tally_button
+    icon: "mdi:eye"
+    on_press:
+      - lambda: |-
+          id(tally_color) = 2;
+      - component.update: led_matrix_display
+      - if:
+          condition:
+            lambda: 'return !id(matrix_light).current_values.is_on();'
+          then:
+            - light.turn_on:
+                id: matrix_light
+                brightness: !lambda 'return id(led_brightness).state / 100.0;'
+
+  - platform: template
+    name: "Program Tally"
+    id: program_tally_button
+    icon: "mdi:broadcast"
+    on_press:
+      - lambda: |-
+          id(tally_color) = 1;
+      - component.update: led_matrix_display
+      - if:
+          condition:
+            lambda: 'return !id(matrix_light).current_values.is_on();'
+          then:
+            - light.turn_on:
+                id: matrix_light
+                brightness: !lambda 'return id(led_brightness).state / 100.0;'
+
+  - platform: template
+    name: "Clear Preview Tally"
+    id: clear_preview_button
+    icon: mdi:eye-off
+    on_press:
+      - lambda: |-
+          if (id(tally_color) == 2) {
+            id(tally_color) = 0;
+          }
+      - component.update: led_matrix_display
+
+  - platform: template
+    name: "Clear Program Tally"
+    id: clear_program_button
+    icon: mdi:broadcast-off
+    on_press:
+      - lambda: |-
+          if (id(tally_color) == 1) {
+            id(tally_color) = 0;
+          }
+      - component.update: led_matrix_display
+
+  - platform: template
+    name: "Clear Tally"
+    id: clear_tally_button
+    icon: mdi:dots-grid
+    on_press:
+      - lambda: |-
+          id(tally_color) = 0;
+      - component.update: led_matrix_display
+
+  - platform: template
+    name: "Show 1 Dot"
+    id: show_1_dot_button
+    internal: true
+    on_press:
+      - script.execute:
+          id: show_dots
+          num_dots: 1
+
+  - platform: template
+    name: "Show 2 Dots"
+    id: show_2_dots_button
+    internal: true
+    on_press:
+      - script.execute:
+          id: show_dots
+          num_dots: 2
+
+  - platform: template
+    name: "Show 3 Dots"
+    id: show_3_dots_button
+    internal: true
+    on_press:
+      - script.execute:
+          id: show_dots
+          num_dots: 3
+
+  - platform: template
+    name: "Show 4 Dots"
+    id: show_4_dots_button
+    internal: true
+    on_press:
+      - script.execute:
+          id: show_dots
+          num_dots: 4
+
+  - platform: template
+    name: "Show 5 Dots"
+    id: show_5_dots_button
+    internal: true
+    on_press:
+      - script.execute:
+          id: show_dots
+          num_dots: 5
+
+  - platform: template
+    name: "Clear Dots"
+    id: clear_dots_button
+    icon: mdi:dots-horizontal
+    on_press:
+      - lambda: |-
+          id(display_dots) = 0;
+      - component.update: led_matrix_display
+
+# Number inputs for camera source tracking and brightness
+number:
+  - platform: template
+    name: "Current Program Source"
+    id: current_program_source
+    icon: mdi:broadcast
+    optimistic: true
+    min_value: 0
+    max_value: 5
+    step: 1
+    initial_value: 0
+    on_value:
+      then:
+        - script.execute: update_tally_display
+
+  - platform: template
+    name: "Current Preview Source"
+    id: current_preview_source
+    icon: mdi:eye-settings
+    optimistic: true
+    min_value: 0
+    max_value: 5
+    step: 1
+    initial_value: 0
+    on_value:
+      then:
+        - script.execute: update_tally_display
+
+  - platform: template
+    name: "Tally Camera Number"
+    id: tally_camera_number
+    icon: mdi:numeric
+    optimistic: true
+    min_value: 1
+    max_value: 5
+    step: 1
+    restore_value: true
+    on_value:
+      then:
+        - script.execute: update_tally_display
+
+  - platform: template
+    name: "LED Brightness"
+    id: led_brightness
+    icon: mdi:brightness-percent
+    optimistic: true
+    min_value: 1
+    max_value: 100
+    step: 1
+    initial_value: 50
+    restore_value: true
+    unit_of_measurement: "%"
+    on_value:
+      then:
+        - component.update: led_matrix_display
+
+preferences:
+  flash_write_interval: 5s
+
+display:
+  - platform: addressable_light
+    id: led_matrix_display
+    addressable_light_id: matrix_light
+    width: 5
+    height: 5
+    rotation: 180
+    update_interval: 16ms
+    lambda: |-
+          // Get brightness factor (0.01 to 1.0)
+          float brightness_factor = id(led_brightness).state / 100.0;
+          
+          // First, fill the appropriate color for the top 4 rows based on tally_color
+          if (id(tally_color) == 1) {
+            // Red (Program) - apply brightness
+            int red_val = (int)(255 * brightness_factor);
+            it.filled_rectangle(0, 0, 5, 4, Color(red_val, 0, 0));
+          } else if (id(tally_color) == 2) {
+            // Green (Preview) - apply brightness
+            int green_val = (int)(255 * brightness_factor);
+            it.filled_rectangle(0, 0, 5, 4, Color(0, green_val, 0));
+          } else {
+            // Off/Black
+            it.filled_rectangle(0, 0, 5, 4, Color(0, 0, 0));
+          }
+          
+          // Then draw the white dots on the bottom row with brightness
+          int white_val = (int)(255 * brightness_factor);
+          Color white = Color(white_val, white_val, white_val);
+          Color black = Color(0, 0, 0);
+          
+          // Bottom row is y=4, x positions 0-4
+          for (int i = 0; i < 5; i++) {
+            if (i < id(display_dots)) {
+              it.draw_pixel_at(i, 4, white);
+            } else {
+              it.draw_pixel_at(i, 4, black);
+            }
+          }
+
+text_sensor:
+  - platform: wifi_info
+    ip_address:
+      name: IP Address
+      icon: mdi:ip-outline
+      update_interval: 15min
+    mac_address:
+      name: MAC Address
+      id: mac_address
+      icon: mdi:router-wireless
+
+  - platform: template
+    name: "Hostname"
+    icon: mdi:pound
+    lambda: |-
+      return {App.get_name() + ".local"};
+    update_interval: 60min
+    entity_category: "diagnostic"
