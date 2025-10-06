@@ -131,7 +131,7 @@ light:
   - platform: esp32_rmt_led_strip
     chipset: ws2812
     rgb_order: GRB
-    internal: false
+    internal: true
     icon: mdi:led-outline
     pin: 27
     num_leds: 25
