@@ -17,6 +17,10 @@ esp32:
     type: esp-idf
 
 logger:
+  level: DEBUG
+  logs:
+    mpu6886: NONE
+    sensor: NONE
 
 web_server:
   version: 3
@@ -34,6 +38,12 @@ wifi:
 improv_serial:
 
 captive_portal:
+
+i2c:
+  sda: 25
+  scl: 21
+  scan: true
+  #frequency: 200kHz
 
 script:
   - id: boot_effect
@@ -99,6 +109,56 @@ script:
           }
       - component.update: led_matrix_display
 
+  # Fires after delay if only ONE click happened
+  - id: single_click_timeout
+    mode: restart
+    then:
+      - delay: 300ms          # Double-click window. Shorten or lengthen as needed.
+      - if:
+          condition:
+            lambda: 'return id(click_count) == 1;'
+          then:
+            - binary_sensor.template.publish:
+                id: button_released
+                state: ON
+            - delay: 120ms
+            - binary_sensor.template.publish:
+                id: button_released
+                state: OFF
+      - lambda: |-
+          id(click_count) = 0;   // Reset after window (single or no click)
+
+  # Emits a double-click pulse immediately when detected
+  - id: double_click_pulse
+    then:
+      - binary_sensor.template.publish:
+          id: button_double_released
+          state: ON
+      - delay: 150ms
+      - binary_sensor.template.publish:
+          id: button_double_released
+          state: OFF
+      - lambda: |-
+          id(click_count) = 0;   // Reset so new sequences can start
+
+  - id: long_press_timer
+    mode: restart
+    then:
+      - delay: 800ms          # long press threshold
+      - if:
+          condition:
+            lambda: 'return id(raw_button).state && !id(long_press_fired);'
+          then:
+            - lambda: |-
+                id(long_press_fired) = true;   // mark so release logic skips click counting
+            - binary_sensor.template.publish:
+                id: button_long_press
+                state: ON
+            - delay: 200ms
+            - binary_sensor.template.publish:
+                id: button_long_press
+                state: OFF
+
 # Add global variables to track display state
 globals:
   - id: display_dots
@@ -111,21 +171,134 @@ globals:
     restore_value: no
     initial_value: '0'  # 0 = off, 1 = red (program), 2 = green (preview)
 
+  - id: click_count
+    type: int
+    restore_value: no
+    initial_value: '0'
+
+  - id: press_started_ms
+    type: unsigned long
+    restore_value: no
+    initial_value: '0'
+
+  - id: long_press_fired
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
 binary_sensor:
+  # Raw hardware button (internal)
   - platform: gpio
-    name: "Single Button Press"
-    id: button1
-    icon: mdi:gesture-tap-button
+    id: raw_button
     pin:
       number: 39
       inverted: true
-    on_multi_click:
-    - timing:
-        - ON for at most 1s
-        - OFF for at least 0.5s
-      then:
-        - logger.log: "Single Click"
+    internal: true
+    filters:
+      - delayed_on: 15ms
+      - delayed_off: 15ms
+    on_press:
+      - lambda: |-
+          id(press_started_ms) = millis();
+          id(long_press_fired) = false;
+      - script.execute: long_press_timer
+    on_release:
+      - lambda: |-
+          // If long press already fired, just reset state & abort.
+          if (id(long_press_fired)) {
+            id(click_count) = 0;
+            return;
+          }
+          // Not a long press -> continue with click counting logic
+          id(click_count)++;
+          if (id(click_count) == 1) {
+            id(single_click_timeout).execute();
+          } else if (id(click_count) == 2) {
+            id(single_click_timeout).stop();
+            id(double_click_pulse).execute();
+          }
 
+  # Single-click pulse (published only if no second click)
+  - platform: template
+    id: button_released
+    icon: mdi:gesture-tap
+    name: "Button Released"
+
+  # Double-click pulse
+  - platform: template
+    id: button_double_released
+    icon: mdi:gesture-double-tap
+    name: "Button Double Released"
+
+  - platform: template
+    id: button_long_press
+    icon: mdi:gesture-tap-hold
+    name: "Button Long Press"
+
+  - platform: template
+    name: "Roll 0°"
+    icon: mdi:horizontal-rotate-counterclockwise
+    lambda: |-
+      return fabs(id(roll_quantized).state - 0.0) < 1.0;
+  - platform: template
+    name: "Roll 180°"
+    icon: mdi:horizontal-rotate-clockwise
+    lambda: |-
+      return fabs(id(roll_quantized).state - 180.0) < 1.0;
+
+sensor:
+  - platform: mpu6886
+    address: 0x68
+    accel_x:
+      id: accel_x
+    accel_y:
+      id: accel_y
+    accel_z:
+      id: accel_z
+    update_interval: 200ms
+
+  # Quantized Roll (0,90,180,270)
+  - platform: template
+    name: "Roll (Quantized 90°)"
+    id: roll_quantized
+    internal: true
+    unit_of_measurement: "°"
+    update_interval: 200ms
+    lambda: |-
+      float ax = id(accel_x).state;
+      float ay = id(accel_y).state;
+      float az = id(accel_z).state;
+
+      // Compute raw roll (accelerometer method)
+      float roll = atan2(ay, az) * 180.0 / M_PI;
+      if (roll < 0) roll += 360.0;
+
+      // Quantize
+      int candidate = ((int) floor((roll + 45.0f) / 90.0f) * 90) % 360;
+
+      // Pitch gate: if we are pitched too far (|ax| large), ignore new candidates
+      const float PITCH_BLOCK = 0.40f;   // ~0.40g threshold; tune (0.35–0.50 typical)
+      static int last_q = -1;
+
+      if (last_q < 0) {
+        last_q = candidate;
+        return (float) candidate;
+      }
+
+      if (fabs(ax) > PITCH_BLOCK) {
+        // Ignore update, return last known bucket
+        return (float) last_q;
+      }
+
+      // Optional hysteresis to avoid jitter near boundaries
+      const float HYST = 12.0f;
+      float diff_angle = fabs(roll - last_q);
+      if (candidate != last_q) {
+        if (diff_angle > (45.0f + HYST)) {
+          last_q = candidate;
+        }
+      }
+      return (float) last_q;
 # Define the LED matrix display
 light:
   - platform: esp32_rmt_led_strip
@@ -326,36 +499,36 @@ display:
     rotation: 180
     update_interval: 16ms
     lambda: |-
-          // Get brightness factor (0.01 to 1.0)
-          float brightness_factor = id(led_brightness).state / 100.0;
-          
-          // First, fill the appropriate color for the top 4 rows based on tally_color
-          if (id(tally_color) == 1) {
-            // Red (Program) - apply brightness
-            int red_val = (int)(255 * brightness_factor);
-            it.filled_rectangle(0, 0, 5, 4, Color(red_val, 0, 0));
-          } else if (id(tally_color) == 2) {
-            // Green (Preview) - apply brightness
-            int green_val = (int)(255 * brightness_factor);
-            it.filled_rectangle(0, 0, 5, 4, Color(0, green_val, 0));
-          } else {
-            // Off/Black
-            it.filled_rectangle(0, 0, 5, 4, Color(0, 0, 0));
-          }
-          
-          // Then draw the white dots on the bottom row with brightness
-          int white_val = (int)(255 * brightness_factor);
-          Color white = Color(white_val, white_val, white_val);
-          Color black = Color(0, 0, 0);
-          
-          // Bottom row is y=4, x positions 0-4
-          for (int i = 0; i < 5; i++) {
-            if (i < id(display_dots)) {
-              it.draw_pixel_at(i, 4, white);
-            } else {
-              it.draw_pixel_at(i, 4, black);
-            }
-          }
+      // Get brightness factor (0.01 to 1.0)
+      float brightness_factor = id(led_brightness).state / 100.0;
+
+      // Fill the top 4 rows based on tally_color
+      if (id(tally_color) == 1) {
+        // Red (Program)
+        int red_val = (int)(255 * brightness_factor);
+        it.filled_rectangle(0, 0, 5, 4, Color(red_val, 0, 0));
+      } else if (id(tally_color) == 2) {
+        // Green (Preview)
+        int green_val = (int)(255 * brightness_factor);
+        it.filled_rectangle(0, 0, 5, 4, Color(0, green_val, 0));
+      } else {
+        // Off/Black
+        it.filled_rectangle(0, 0, 5, 4, Color(0, 0, 0));
+      }
+
+      // Bottom row dots now RED instead of white
+      int red_dot_val = (int)(255 * brightness_factor);
+      Color red_dot = Color(red_dot_val, 0, 0);
+      Color black = Color(0, 0, 0);
+
+      // Bottom row is y = 4, x positions 0-4
+      for (int i = 0; i < 5; i++) {
+        if (i < id(display_dots)) {
+          it.draw_pixel_at(i, 4, red_dot);
+        } else {
+          it.draw_pixel_at(i, 4, black);
+        }
+      }
 
 text_sensor:
   - platform: wifi_info
