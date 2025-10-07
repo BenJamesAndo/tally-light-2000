@@ -32,6 +32,10 @@ https://github.com/josephdadams/TallyArbiter/blob/master/listener_clients/M5Atom
 Battery:
 https://shop.m5stack.com/products/atom-tailbat
 
+**Demo**
+
+![Example](https://behuestudio.com/wp-content/uploads/2025/10/Smart-Tally-Example.gif)
+
 **Wishlist**
 
 Support ATOMS3
