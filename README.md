@@ -1,4 +1,5 @@
-
+Behue Tally Light
+=================================================================================
 
 
 ESPHome firmware to make your M5 Atom Matrix super smart and mega flexible.
@@ -10,7 +11,7 @@ ESPHome firmware to make your M5 Atom Matrix super smart and mega flexible.
 5. Create Companion triggers to feed program and preview data to the device.
 6. Win!
 
-More info via the [Installation Wiki](../../wiki/Installation)
+More info via the [Wiki](../../wiki)
 
 **Features**
 
