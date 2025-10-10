@@ -1,7 +1,11 @@
-Behue Tally Light
+Tally Light 2000!
 =================================================================================
 
 > ESPHome firmware to make your M5 Atom Matrix super smart and mega flexible. Works with Bitfocus Companion or Home Assistant.
+
+## Demo
+
+![Example](https://behuestudio.com/wp-content/uploads/2025/10/Smart-Tally-Example.gif)
 
 | Features                                     
 | :-----------------------------
@@ -12,10 +16,6 @@ Behue Tally Light
 | Integrates with Bitfocus Companion and Home Assistant
 | Full Web UI for manual control
 | Easy HTTP API
-
-## Demo
-
-![Example](https://behuestudio.com/wp-content/uploads/2025/10/Smart-Tally-Example.gif)
 
 <img width="756" height="722" alt="image" src="https://github.com/user-attachments/assets/5e241cfd-8489-483d-b1be-4fa2cf8f5d66" />
 
@@ -54,3 +54,5 @@ Support ATOMS3
 Change program and preview colours
 \
 Support more than 5 program & preview sources
+\
+Automatic OTA Updates
