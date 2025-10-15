@@ -3,7 +3,7 @@ Tally Light 2000!
 
 > ESPHome firmware to make your M5 Atom Matrix super smart and mega flexible. Works with Bitfocus Companion or Home Assistant.
 
-## Demo
+## Features
 
 ![Example](https://behuestudio.com/wp-content/uploads/2025/10/Smart-Tally-Example.gif)
 
@@ -16,9 +16,6 @@ Tally Light 2000!
 | Integrates with Bitfocus Companion and Home Assistant
 | Full Web UI for manual control
 | Easy HTTP API
-
-<img width="756" height="722" alt="image" src="https://github.com/user-attachments/assets/5e241cfd-8489-483d-b1be-4fa2cf8f5d66" />
-
 
 ## Setup Guide
 
@@ -51,8 +48,24 @@ https://shop.m5stack.com/products/atom-tailbat
 \
 Support ATOMS3
 \
-Change program and preview colours
+Change program and preview colours to any colour
 \
 Support more than 5 program & preview sources
 \
 Automatic OTA Updates
+
+## Video Guide
+
+<a href="https://youtu.be/OBXKgOFOJzI">
+    <img src="https://img.youtube.com/vi/OBXKgOFOJzI/maxresdefault.jpg" alt="Watch the video" style="width: 50%; border-radius: 8px;">
+</a>
+
+[Watch Video Guide](https://youtu.be/OBXKgOFOJzI)
+
+## Screenshots
+\
+<img width="694" height="807" alt="image" src="https://github.com/user-attachments/assets/eba81ef0-d935-4e5a-a421-5d387594afae" />
+<img width="702" height="347" alt="image" src="https://github.com/user-attachments/assets/80d76094-37d3-4e93-bcd7-8b78b2df0eb8" />
+<img width="432" height="324" alt="image" src="https://github.com/user-attachments/assets/2b112ea4-7c3c-4aac-b048-3060a1546b40" />
+<img width="542" height="345" alt="image" src="https://github.com/user-attachments/assets/704ce9f2-16bd-4472-9a3b-9b98c37b01d4" />
+
