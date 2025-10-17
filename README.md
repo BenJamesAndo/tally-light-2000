@@ -19,7 +19,7 @@ Tally Light 2000!
 
 ## Setup Guide
 
-1. Download the firmware via the [Releases](../../releases)
+1. Download the appropriate firmware via the [Releases](../../releases)
 2. Flash the firmware to your M5 at https://web.esphome.io
 3. Link it up to your WiFi
 4. Add it to Companion via ESPHome connection
@@ -38,8 +38,12 @@ https://shop.m5stack.com/products/atom-matrix-esp32-development-kit
 
 **Resources**
 
-Mount:
+Camera Mount:
 https://github.com/josephdadams/TallyArbiter/blob/master/listener_clients/M5AtomMatrix-listener/m5_atom_mount/m5_atom_mount.stl
+\
+\
+Can be cheaply printed and delivered via Craftcloud: https://craftcloud3d.com/configuration/d2795ef6-e16f-4a9a-bbd6-7a1bbeca0e73
+\
 \
 Battery:
 https://shop.m5stack.com/products/atom-tailbat
@@ -51,6 +55,8 @@ Support ATOMS3
 Change program and preview colours to any colour
 \
 Support more than 5 program & preview sources
+\
+Status LED
 \
 Automatic OTA Updates
 
