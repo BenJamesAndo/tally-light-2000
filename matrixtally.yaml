@@ -177,6 +177,16 @@ globals:
     restore_value: yes
     initial_value: '1'
 
+  - id: full_matrix_mode
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
+  - id: hide_dots
+    type: bool
+    restore_value: yes
+    initial_value: 'false'
+
   - id: click_count
     type: int
     restore_value: no
@@ -412,7 +422,7 @@ button:
           num_dots: 5
 
   - platform: template
-    name: "Clear Dots"
+    name: "Clear Program Tracker Dots"
     id: clear_dots_button
     icon: mdi:dots-horizontal
     on_press:
@@ -423,6 +433,44 @@ button:
   - platform: restart
     name: Reboot
     entity_category: "diagnostic"
+
+switch:
+  - platform: template
+    name: "Full Screen Tally Mode"
+    id: full_matrix_mode_switch
+    icon: mdi:grid
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    web_server:
+      sorting_weight: 3
+    entity_category: "config"
+    on_turn_on:
+      - lambda: |-
+          id(full_matrix_mode) = true;
+      - component.update: led_matrix_display
+    on_turn_off:
+      - lambda: |-
+          id(full_matrix_mode) = false;
+      - component.update: led_matrix_display
+
+  - platform: template
+    name: "Hide Program Tracker Dots"
+    id: hide_dots_switch
+    icon: mdi:dots-horizontal-circle-outline
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    web_server:
+      sorting_weight: 4
+    entity_category: "config"
+    on_turn_on:
+      - lambda: |-
+          id(hide_dots) = true;
+      - component.update: led_matrix_display
+    on_turn_off:
+      - lambda: |-
+          id(hide_dots) = false;
+      - component.update: led_matrix_display
+
 
 number:
   - platform: template
@@ -478,6 +526,8 @@ number:
     initial_value: 50
     restore_value: true
     unit_of_measurement: "%"
+    web_server:
+      sorting_weight: 2
     entity_category: "config"
     on_value:
       then:
@@ -587,15 +637,34 @@ display:
         it.filled_rectangle(0, 0, 5, 4, Color(0, 0, 0));
       }
 
-      // Bottom row dots - inherit program color
-      Color dot_color = prog_color;
-      Color black = Color(0, 0, 0);
-
-      for (int i = 0; i < 5; i++) {
-        if (i < id(display_dots)) {
-          it.draw_pixel_at(i, 4, dot_color);
+      // Bottom row - either dots or full depending on mode and tally status
+      if (id(full_matrix_mode) && id(tally_color) != 0) {
+        // Full matrix mode: fill bottom row only when tally is active (program or preview)
+        if (id(tally_color) == 1) {
+          it.filled_rectangle(0, 4, 5, 1, prog_color);
+        } else if (id(tally_color) == 2) {
+          it.filled_rectangle(0, 4, 5, 1, prev_color);
+        }
+      } else if (id(hide_dots)) {
+        // Hide tracker mode: fill bottom row with tally color if active, black if not
+        if (id(tally_color) == 1) {
+          it.filled_rectangle(0, 4, 5, 1, prog_color);
+        } else if (id(tally_color) == 2) {
+          it.filled_rectangle(0, 4, 5, 1, prev_color);
         } else {
-          it.draw_pixel_at(i, 4, black);
+          it.filled_rectangle(0, 4, 5, 1, Color(0, 0, 0));
+        }
+      } else {
+        // Normal tracker mode: show program tracker dots on bottom row
+        Color dot_color = prog_color;
+        Color black = Color(0, 0, 0);
+
+        for (int i = 0; i < 5; i++) {
+          if (i < id(display_dots)) {
+            it.draw_pixel_at(i, 4, dot_color);
+          } else {
+            it.draw_pixel_at(i, 4, black);
+          }
         }
       }
 
