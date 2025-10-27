@@ -1,3 +1,4 @@
+# If compiling for yourself and you're also using Bitfocus Companion then use ESPHome 2025.9 or below as there's a breaking change with 2025.10 that the Companion module needs to fix.
 substitutions:
   tally_version: "1.3"
 
